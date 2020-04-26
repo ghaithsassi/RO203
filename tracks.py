@@ -1,10 +1,42 @@
-h = [3,2,3,4,7,6,4,6]
-v = [8,4,4,5,4,4,4,2]
-lx=[(2,0),(8,1),(2,4)]
-lz=[(2,0),(7,2),(1,5)]
-def tracks(v,h,lx, lz) :
-    # import the library pulp as p 
-    import pulp as p 
+# import the library pulp as p 
+import pulp as p 
+   
+       
+def tracks() :
+    fname = "./donnees.txt"
+
+    f= open(fname, 'r') 
+    line = f.readline()
+    h=[]
+    v=[]
+    lx=[]
+    lz=[]
+
+    for i in line :
+        if i not in [',',']',' ','h','=','[','\n'] :
+            h.append(int(i))
+        
+    line = f.readline()
+    for i in line :
+        if i not in [',',']',' ','v','=','[','\n'] :
+            v.append(int(i))
+    line = f.readline()
+    i=0
+    while i< len(line) : 
+        if i=='(' : 
+            lx.append(line[i+1,i+2])
+            i+=2
+        else : 
+            i+=1 
+    line = f.readline()
+    i=0
+    while i< len(line) : 
+        if i=='(' : 
+            lz.append(line[i+1,i+2])
+            i+=2
+        else : 
+            i+=1  
+    
   
     # Create a LP Minimization problem 
     Lp_prob = p.LpProblem('tracks')  
