@@ -67,6 +67,26 @@ function readInputFile(inputFile::String)
 
 end
 
+
+function cellType(q::Int64)
+    if(q == 1)
+        s = '='
+    elseif(q == 2)
+        s = '║'
+    elseif(q == 3)
+        s ='╚'
+    elseif(q == 4)
+        s = '╔'
+    elseif(q == 5)
+        s = '╗'
+    elseif(q == 6)
+        s = '╝'
+    else
+        s = '*'
+    end
+    return s
+end
+
 function displayGrid(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::Tuple{Int,Int,Int},L::Array{Tuple{Int,Int,Int},1})
     n = size(v,1)
     m = size(h,1)
@@ -74,24 +94,6 @@ function displayGrid(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::
     fill!(grid,'*')
     println(size(grid,2))
 
-    function cellType(q::Int64)
-        if(q == 1)
-            s = '='
-        elseif(q == 2)
-            s = '║'
-        elseif(q == 3)
-            s ='╚'
-        elseif(q == 4)
-            s = '╔'
-        elseif(q == 5)
-            s = '╗'
-        elseif(q == 6)
-            s = '╝'
-        else
-            s = '*'
-        end
-        return s
-    end
     grid[A[1],A[2]] = cellType(A[3])
     grid[B[1],B[2]] = cellType(B[3])
 
@@ -113,81 +115,71 @@ function displayGrid(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::
     end
 end
 
-"""
-Display cplex solution
 
-Argument
-- x: 3-dimensional variables array such that x[i, j, k] = 1 if cell (i, j) has value k
-"""
-function displaySolution(x::Array{VariableRef,3})
-
-    n = size(x, 1)
-    
-    blockSize = round.(Int, sqrt(n))
-
-    # Display the upper border of the grid
-    println(" ", "-"^(3*n+blockSize-1)) 
-
-    # For each cell (l, c)
-    for l in 1:n
-        for c in 1:n
-
-            if rem(c, blockSize) == 1
-                print("|")
-            end  
-
-            for k in 1:n
-                if JuMP.value(x[l, c, k]) > TOL
-                    if k < 10
-                        print(" ")
-                    end 
-                    print(k)
-                end
-            end 
-            print(" ")
+function displaySolution(h::Array{Int, 1},v::Array{Int, 1},x::Array{VariableRef,3})
+    n = size(x,1)
+    m = size(x,2)
+    println("")
+    for j in 1:m
+        print(h[j]," ")
+    end
+    println("")
+    for i in 1:n
+        println("")
+        for j in 1:m 
+            if(JuMP.value(x[i,j,1])>0)
+                print("= ")
+            elseif(JuMP.value(x[i,j,2])>0)
+                print("║ ")
+            elseif(JuMP.value(x[i,j,3])>0)
+                print("╚ ")
+            elseif(JuMP.value(x[i,j,4])>0)
+                print("╔ ")
+            elseif(JuMP.value(x[i,j,5])>0)
+                print("╗ ")
+            elseif(JuMP.value(x[i,j,6])>0)
+                print("╝ ")
+            else
+                print("* ")
+            end
         end
-        println("|")
-
-        if rem(l, blockSize) == 0
-            println(" ", "-"^(3*n+blockSize-1))
-        end 
+        print(" ",v[i])
     end
 end
 
 
-"""
-Save a grid in a text file
+function saveInstance(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::Tuple{Int,Int,Int},L::Array{Tuple{Int,Int,Int},1}, outputFile::String)
 
-Argument
-- t: 2-dimensional array of size n*n
-- outputFile: path of the output file
-"""
-function saveInstance(t::Array{Int64, 2}, outputFile::String)
-
-    n = size(t, 1)
+    n = size(v,1)
+    m = size(h,1)
 
     # Open the output file
     writer = open(outputFile, "w")
 
-    # For each cell (l, c) of the grid
-    for l in 1:n
-        for c in 1:n
-
-            # Write its value
-            if t[l, c] == 0
-                print(writer, " ")
-            else
-                print(writer, t[l, c])
-            end
-
-            if c != n
-                print(writer, ",")
-            else
-                println(writer, "")
-            end
+    for i in 1:n
+        print(writer,v[i])
+        if i != n
+            print(writer, ",")
+        else
+            println(writer, "")
         end
     end
 
+    for j in 1:m
+        print(writer,h[j])
+        if j != m
+            print(writer, ",")
+        else
+            println(writer, "")
+        end
+    end
+
+    println(write,A[1],",",A[2],",",A[3])
+    println(write,B[1],",",B[2],",",B[3])
+
+    for e in L
+        println(write,e[1],",",e[2],",",e[3])
+    end
     close(writer)
     
 end 
@@ -204,13 +196,14 @@ function writeSolution(fout::IOStream, x::Array{VariableRef,3})
 
     # Convert the solution from x[i, j, k] variables into t[i, j] variables
     n = size(x, 1)
-    t = Array{Int64}(undef, n, n)
+    m = size(x, 2)
+    t = Array{Char}(undef, n, n)
     
-    for l in 1:n
-        for c in 1:n
-            for k in 1:n
-                if JuMP.value(x[l, c, k]) > TOL
-                    t[l, c] = k
+    for i in 1:n
+        for j in 1:m
+            for k in 1:6
+                if JuMP.value(x[i, j, k]) > TOL
+                    t[l, c] = cellType(k)
                 end
             end
         end 
