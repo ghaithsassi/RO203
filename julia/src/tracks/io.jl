@@ -69,7 +69,35 @@ end
 
 function displayGrid(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::Tuple{Int,Int,Int},L::Array{Tuple{Int,Int,Int},1})
     n = size(v,1)
-    m = size(h,2)
+    m = size(h,1)
+    grid = Array{Char}(undef,n,m)
+    fill!(grid,'*')
+    println(size(grid,2))
+
+    function cellType(q::Int64)
+        if(q == 1)
+            s = '='
+        elseif(q == 2)
+            s = '║'
+        elseif(q == 3)
+            s ='╚'
+        elseif(q == 4)
+            s = '╔'
+        elseif(q == 5)
+            s = '╗'
+        elseif(q == 6)
+            s = '╝'
+        else
+            s = '*'
+        end
+        return s
+    end
+    grid[A[1],A[2]] = cellType(A[3])
+    grid[B[1],B[2]] = cellType(B[3])
+
+    for e in L 
+        grid[e[1],e[2]]=cellType(e[3])
+    end    
 
     println("")
     for j in 1:m
@@ -79,21 +107,7 @@ function displayGrid(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::
     for i in 1:n
         println("")
         for j in 1:m 
-            if(JuMP.value(x[i,j,1])
-                print("= ")
-            elseif(JuMP.value(x[i,j,2])>0)
-                print("║ ")
-            elseif(JuMP.value(x[i,j,3])>0)
-                print("╚ ")
-            elseif(JuMP.value(x[i,j,4])>0)
-                print("╔ ")
-            elseif(JuMP.value(x[i,j,5])>0)
-                print("╗ ")
-            elseif(JuMP.value(x[i,j,6])>0)
-                print("╝ ")
-            else
-                print("* ")
-            end
+           print(grid[i,j]," ")
         end
         print(" ",v[i])
     end
