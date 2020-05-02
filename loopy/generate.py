@@ -40,7 +40,6 @@ def generate_loop(height,width,minLoopLength):
                 break
             v = randint(0,len(possible))
             next_  = possible[v]
-
             if(current[0]+1==next_[0]):
                 z[current[0]][current[1]] = True
             elif(current[0]-1==next_[0]):
@@ -84,8 +83,8 @@ def fill_grid(grid,x,z,p):
 def generateInstanc():
     p = [0.15,0.4,0.5,0.5]
     f = 0.7
-    height = randint(5,7)
-    width = randint(5,7)
+    height = randint(5,10)
+    width = randint(5,10)
     minLoopLength = int(height*width*f)
     grid,x,z = generate_loop(height,width,minLoopLength)
     grid = fill_grid(grid,x,z,p)

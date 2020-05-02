@@ -179,6 +179,7 @@ def heuristicSolve(grid):
         if(s==count_edges_cylcle):
             solved = True
             break
+        
         oneloop = syp.true
 
         for i in range(xRow):
