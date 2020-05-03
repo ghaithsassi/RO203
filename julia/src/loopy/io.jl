@@ -1,28 +1,8 @@
-# This file contains functions related to reading, writing and displaying a grid and experimental results
-
 using JuMP
 using Plots
 import GR
-TOL = 0.000001
 
-"""
-Read a grid from an input file
 
-- Argument:
-inputFile: path of the input file
-
-- Example of input file for a 9x9 grid
-h = [3,2,3,4,7,6,4,6]
-v = [8,4,4,5,4,4,4,2]
-A = (3,1,6)
-B = (8,2,4)
-l= [(2,5,4)]
-
-- Prerequisites
-Let n be the grid size.
-Each line of the input file must contain n values separated by commas.
-A value can be an integer or a white space
-"""
 function readInputFile(inputFile::String)
 
     # Open the input file
@@ -31,243 +11,219 @@ function readInputFile(inputFile::String)
     data = readlines(datafile)
     close(datafile)
     
-    n = length(split(data[1], ","))
-    m = length(split(data[2], ","))
+    n = length(data)
+    m = length(split(data[1], ","))
+    t = Array{Char}(undef, n, m)
+    fill!(t,' ')
 
-    v = Array{Int64}(undef, n)
-    h = Array{Int64}(undef, m)
+    lineNb = 1
 
-    lineSplit = split(data[1], ",")
-    if size(lineSplit, 1) == n
-        for colNb in 1:n
-            v[colNb] = parse(Int64, lineSplit[colNb])
+    # For each line of the input file
+    for line in data
+
+        lineSplit = split(line, ",")
+        if size(lineSplit, 1) == n
+            for colNb in 1:n
+
+                if lineSplit[colNb] != " "
+                    t[lineNb, colNb] = Char( parse(Int64, lineSplit[colNb]) +48  )
+                end
+            end
+        end 
+        
+        lineNb += 1
+    end
+
+    return t
+
+end
+
+function displayGrid(t::Array{Char,2})
+    height = size(t,1)
+    width = size(t,2)
+    
+    xHeight = height +1
+    xWidth =  width
+
+    zHeight = height
+    zWidth = width + 1
+
+    println("")
+    for i in 1:height
+        for j in 1:xWidth
+            print(".  ")
         end
-    end
-    lineSplit = split(data[2], ",")
-    if size(lineSplit, 1) == m
-        for colNb in 1:m
-            h[colNb] = parse(Int64, lineSplit[colNb])
-        end
-    end
-
-    lineSplit = split(data[3], ",")
-    A = ( parse(Int64, lineSplit[1]),parse(Int64, lineSplit[2]),parse(Int64, lineSplit[3]) )
-
-    lineSplit = split(data[4], ",")
-    B = ( parse(Int64, lineSplit[1]),parse(Int64, lineSplit[2]),parse(Int64, lineSplit[3]) )
-
-    L = Array{Tuple{Int,Int,Int}}(undef,0)
-
-    for i in 5:size(data,1)
-        lineSplit = split(data[i], ",")
-        e = ( parse(Int64, lineSplit[1]),parse(Int64, lineSplit[2]),parse(Int64, lineSplit[3]) )
-        push!(L,e)
-    end
-
-    return h,v,A,B,L
-
-end
-
-
-function cellType(q::Int64)
-    if(q == 1)
-        s = '='
-    elseif(q == 2)
-        s = '║'
-    elseif(q == 3)
-        s ='╚'
-    elseif(q == 4)
-        s = '╔'
-    elseif(q == 5)
-        s = '╗'
-    elseif(q == 6)
-        s = '╝'
-    else
-        s = '*'
-    end
-    return s
-end
-
-function cellTypeId(s::Char)
-    if(s == '=')
-        return 1
-    elseif( s == '║')
-        return 2
-    elseif(s =='╚' )
-        return 3
-    elseif(s == '╔')
-        return 4
-    elseif( s == '╗')
-        return 5
-    elseif(s == '╝')
-        return 6
-    end
-    return 0
-end
-
-function displayGrid(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::Tuple{Int,Int,Int},L::Array{Tuple{Int,Int,Int},1})
-    n = size(v,1)
-    m = size(h,1)
-    grid = Array{Char}(undef,n,m)
-    fill!(grid,'*')
-    println(size(grid,2))
-
-    grid[A[1],A[2]] = cellType(A[3])
-    grid[B[1],B[2]] = cellType(B[3])
-
-    for e in L 
-        grid[e[1],e[2]]=cellType(e[3])
-    end    
-
-    println("")
-    for j in 1:m
-        print(h[j]," ")
-    end
-    println("")
-    for i in 1:n
-        println("")
-        for j in 1:m 
-           print(grid[i,j]," ")
-        end
-        print(" ",v[i])
-    end
-end
-
-
-function displaySolution(h::Array{Int, 1},v::Array{Int, 1},x::Array{VariableRef,3})
-    n = size(x,1)
-    m = size(x,2)
-    println("")
-    for j in 1:m
-        print(h[j]," ")
-    end
-    println("")
-    for i in 1:n
-        println("")
-        for j in 1:m 
-            if(JuMP.value(x[i,j,1])>0)
-                print("= ")
-            elseif(JuMP.value(x[i,j,2])>0)
-                print("║ ")
-            elseif(JuMP.value(x[i,j,3])>0)
-                print("╚ ")
-            elseif(JuMP.value(x[i,j,4])>0)
-                print("╔ ")
-            elseif(JuMP.value(x[i,j,5])>0)
-                print("╗ ")
-            elseif(JuMP.value(x[i,j,6])>0)
-                print("╝ ")
-            else
-                print("* ")
+        println(".")
+        for j in 1:zWidth
+            print("  ")
+            if(j<=width)
+                print(t[i,j])
             end
         end
-        print(" ",v[i])
+        println("")
+    
+        
     end
+    for j in 1:xWidth
+        print(".  ")
+    end
+    println(".")
 end
 
 
-function saveInstance(h::Array{Int, 1},v::Array{Int, 1},A::Tuple{Int,Int,Int},B::Tuple{Int,Int,Int},L::Array{Tuple{Int,Int,Int},1}, outputFile::String)
+function displaySolution(t::Array{Char,2},x::Array{VariableRef,2},z::Array{VariableRef,2})
+    height = size(t,1)
+    width = size(t,2)
+    
+    xHeight = height +1
+    xWidth =  width
 
-    n = size(v,1)
-    m = size(h,1)
+    zHeight = height
+    zWidth = width + 1
+
+    println("")
+    for i in 1:height
+        for j in 1:xWidth
+            if( JuMP.value(x[i,j])>0 )
+                print(".__")
+            else
+                print(".  ")
+            end
+        end
+        println(".")
+        for j in 1:zWidth
+            if( JuMP.value(z[i,j])>0)
+                print("| ")
+            else
+                print("  ")
+            end
+            if(j<=width)
+                print(t[i,j])
+            end
+        end
+        println("")
+    
+        
+    end
+    for j in 1:xWidth
+        if( JuMP.value(x[xHeight,j])>0 )
+            print(".__")
+        else
+            print(".  ")
+        end
+    end
+    println(".")
+end
+
+function saveInstance(t::Array{Char, 2}, outputFile::String)
+
+    n = size(t, 1)
+    m = size(t,2)
 
     # Open the output file
     writer = open(outputFile, "w")
 
-    for i in 1:n
-        print(writer,v[i])
-        if i != n
-            print(writer, ",")
-        else
-            println(writer, "")
+    # For each cell (l, c) of the grid
+    for l in 1:n
+        for c in 1:m
+
+            # Write its value   
+            print(writer, t[l, c])
+
+            if c != n
+                print(writer, ",")
+            else
+                println(writer, "")
+            end
         end
     end
 
-    for j in 1:m
-        print(writer,h[j])
-        if j != m
-            print(writer, ",")
-        else
-            println(writer, "")
-        end
-    end
-
-    println(writer,A[1],",",A[2],",",A[3])
-    println(writer,B[1],",",B[2],",",B[3])
-
-    for e in L
-        println(writer,e[1],",",e[2],",",e[3])
-    end
     close(writer)
     
-end 
+end
 
-
-"""
-Write a solution in an output stream
-
-Arguments
-- fout: the output stream (usually an output file)
-- x: 3-dimensional variables array such that x[i, j, k] = 1 if cell (i, j) has value k
-"""
-function writeSolution(fout::IOStream, x::Array{VariableRef,3})
+function writeSolution(fout::IOStream, x::Array{VariableRef,2},z::Array{VariableRef,2})
 
     # Convert the solution from x[i, j, k] variables into t[i, j] variables
-    n = size(x, 1)
-    m = size(x, 2)
-    t = Array{Char}(undef, n, m)
-    fill!(t,'*')
+
+    height = size(z,1)
+    width = size(x,2)
     
-    for i in 1:n
-        for j in 1:m
-            for k in 1:6
-                if JuMP.value(x[i, j, k]) > TOL
-                    t[i, j] = cellType(k)
-                end
+    xHeight = height +1
+    xWidth =  width
+
+    zHeight = height
+    zWidth = width + 1
+
+    ansX = Array{Int}(undef,xHeight,xWidth)
+    ansZ = Array{Int}(undef,zHeight,zWidth)
+
+    fill!(ansX,0)
+    fill!(ansZ,0)
+
+    
+    for l in 1:xHeight
+        for c in 1:xWidth
+            if(JuMP.value(x[l,c])> TOL)
+                ansX[l,c] = 1
+            else
+                ansX[l,c] = 0
             end
         end 
     end
-    println(t)
+
+    for l in 1:zHeight
+        for c in 1:zWidth
+            if(JuMP.value(z[l,c])> TOL)
+                ansZ[l,c] = 1
+            else
+                ansZ[l,c] = 0
+            end
+        end 
+    end
+
     # Write the solution
-    writeSolution(fout, t)
+    writeSolution(fout, ansX,ansZ)
+
 end
 
 
-
-"""
-Write a solution in an output stream
-
-Arguments
-- fout: the output stream (usually an output file)
-- t: 2-dimensional array of size n*n
-"""
-function writeSolution(fout::IOStream, t::Array{Char, 2})
+function writeSolution(fout::IOStream, x::Array{Int64, 2},z::Array{Int64, 2})
     
-    println(fout, "t = [")
-    n = size(t, 1)
-    m = size(t, 2)
-    for l in 1:n
+    println(fout, "x = [")
+    n = size(z, 1)
+    m = size(x,2)
 
+    
+    for l in 1:n+1
         print(fout, "[ ")
-        
         for c in 1:m
-            print(fout,"'")
-            print(fout,t[l, c])
-            print(fout,"' ")
+            print(fout,x[l, c], " ")
         end 
-
         endLine = "]"
 
-        if l != n
+        if l != n+1
             endLine *= ";"
         end
-
         println(fout, endLine)
     end
-
     println(fout, "]")
-    
-    
+
+    println(fout, "z = [")
+    for l in 1:n
+        print(fout, "[ ")
+        for c in 1:m+1
+            print(fout, z[l, c], " ")
+        end 
+        endLine = "]"
+
+        if l != n+1
+            endLine *= ";"
+        end
+        println(fout, endLine)
+    end
+    println(fout, "]")
+
 end 
 
 """
