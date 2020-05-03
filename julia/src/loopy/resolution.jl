@@ -1,7 +1,5 @@
-using JuMP
 using CPLEX
-using Distributions 
-
+include("generation.jl")
 
 function oneLoopRule(x::Array{VariableRef,2},z::Array{VariableRef,2})
     height = size(z,1)
@@ -139,7 +137,7 @@ function cplexSolve(t::Array{Char, 2})
         s = sum(JuMP.value(x[i,j]) for i in 1:height+1 for j in 1:width) + sum(JuMP.value(z[i,j]) for i in 1:height for j in 1:width+1)
         
         @constraint(m,sum(x[i,j] for i in 1:xHeight for j in 1:xWidth if(JuMP.value(x[i,j])>0))+sum(z[i,j] for i in 1:zHeight for j in 1:zWidth if(JuMP.value(z[i,j])>0)) <= s-1)
-
+        break
     end
     
     
@@ -164,182 +162,91 @@ end
 
 
 
-function displaySolution(t::Array{Char,2},x::Array{VariableRef,2},z::Array{VariableRef,2})
-    height = size(t,1)
-    width = size(t,2)
-    
-    xHeight = height +1
-    xWidth =  width
+function solveDataSet()
 
-    zHeight = height
-    zWidth = width + 1
+    dataFolder = "../data/"
+    resFolder = "../res/"
 
-    println("")
-    for i in 1:height
-        for j in 1:xWidth
-            if( JuMP.value(x[i,j])>0 )
-                print(".__")
-            else
-                print(".  ")
-            end
-        end
-        println(".")
-        for j in 1:zWidth
-            if( JuMP.value(z[i,j])>0)
-                print("| ")
-            else
-                print("  ")
-            end
-            if(j<=width)
-                print(t[i,j])
-            end
-        end
-        println("")
+    resolutionMethod = ["cplex"]
+    resolutionFolder = resFolder .* resolutionMethod
     
-        
-    end
-    for j in 1:xWidth
-        if( JuMP.value(x[xHeight,j])>0 )
-            print(".__")
-        else
-            print(".  ")
+    for folder in resolutionFolder
+        if !isdir(folder)
+            mkdir(folder)
         end
     end
-    println(".")
-end
+            
+    global isOptimal = false
+    global solveTime = -1
 
-
-function generateLoop(height::Int,width::Int,minLoopLength::Int)
-    grid = Array{Char}(undef,height,width)
-    fill!(grid,' ')
-    
-    loop = false
-    k = 0
-
-    x = Array{Bool}(undef,height+1,width)
-    z = Array{Bool}(undef,height,width+1)
-
-    start = ( ceil(Int,rand()*(height+1) ), ceil(Int,rand()*(width+1) ) )
-
-    deadend= Set{ Tuple{Int,Int,Int} }()
-    push!(deadend,(start[1],start[2],0))
-    
-    while(true)
-        fill!(x,false)
-        fill!(z,false)
+    # For each input file
+    # (for each file in folder dataFolder which ends by ".txt")
+    for file in filter(x->occursin(".txt", x), readdir(dataFolder))  
         
-        current = start
-        visited  = Set{Tuple{Int,Int}}()
-        push!(visited,start)
-        k = 0
-        while(true)
-            k+=1
+        println("-- Resolution of ", file)
+        t = readInputFile(dataFolder * file)
 
-            pseudo_possible = Array{Tuple{Int,Int}}([ (current[1]+1,current[2]) ,(current[1]-1,current[2]) ,(current[1],current[2]+1) , (current[1],current[2]-1)])
-            possible = Array{Tuple{Int,Int}}(undef,0)
-            for el in 1:size(pseudo_possible,1)
-                e=pseudo_possible[el]
-                if (e[1] > 0) && (e[1] <= height+1) && (e[2] >= 1 ) && (e[2] <= width+1 ) && ( !in(e,visited) ||  (e == start && k>4) ) && !in((e[1],e[2],k),deadend)
-                    push!(possible,e)
+        # For each resolution method
+        for methodId in 1:size(resolutionMethod, 1)
+            
+            outputFile = resolutionFolder[methodId] * "/" * file
+
+            # If the input file has not already been solved by this method
+            if !isfile(outputFile)
+                
+                fout = open(outputFile, "w")  
+
+                resolutionTime = -1
+                isOptimal = false
+                
+                # If the method is cplex
+                if resolutionMethod[methodId] == "cplex"
+
+                    # Solve it and get the results
+                    isOptimal, x,z, resolutionTime = cplexSolve(t)
+                    
+                    # Also write the solution (if any)
+                    if isOptimal
+                        writeSolution(fout, x,z)
+                    end
+
+                # If the method is one of the heuristics
+                else
+                    
+                    isSolved = false
+                    solution = []
+
+                    # Start a chronometer 
+                    startingTime = time()
+                    
+                    # While the grid is not solved and less than 100 seconds are elapsed
+                    while !isOptimal && resolutionTime < 100
+                        print(".")
+
+                        isOptimal, solutionX,solutionZ = heuristicSolve(t, resolutionMethod[methodId] == "heuristique2")
+
+                        # Stop the chronometer
+                        resolutionTime = time() - startingTime
+                    end
+
+                    println("")
+
+                    # Write the solution (if any)
+                    if isOptimal
+                        writeSolution(fout, solutionX,solutionZ)
+                    end 
                 end
-            end
-            q = size(possible,1)
-            if( q==0 )
-                push!(deadend,(current[1],current[2],k))
-                break
-            end
-            v = ceil(Int,rand()*q)
-            next_  = possible[v]
-            if(current[1]+1==next_[1])
-                z[current[1],current[2]] = true
-            elseif(current[1]-1==next_[1])
-                z[next_[1],next_[2]] = true
-            elseif(current[2]+1 == next_[2])
-                x[current[1],current[2]] = true
-            elseif(current[2]-1==next_[2])
-                x[next_[1],next_[2]] = true
+
+                println(fout, "solveTime = ", resolutionTime) 
+                println(fout, "isOptimal = ", isOptimal) 
+                close(fout)
             end
 
-            push!(visited,next_ )
-            current = next_
 
-            if(current == start)
-                loop = true
-                break
-            end
-        end
-        if(loop && k >= minLoopLength)
-            break
-        end
-        loop = false
-    end
-    for i in 1:(height)
-        for j in 1:(width)
-            tmp =  [ x[i,j] , x[i+1,j], z[i,j] , z[i,j+1] ]
-            s = sum([1 for e in tmp if e])
-            if(s==0)
-                rd = Distributions.Binomial(1,p[1])
-            elseif(s==1)
-                rd = Distributions.Binomial(1,p[2])
-            elseif(s==2)
-                rd = Distributions.Binomial(1,p[3])
-            elseif(s==3)
-                rd = Distributions.Binomial(1,p[4]) 
-            end
-            if(rand(rd) == 1)
-                grid[i,j] = Char(s+48)
-            end
-        end
-    end
-    return grid
+            # Display the results obtained with the method on the current instance
+            include(outputFile)
+            println(resolutionMethod[methodId], " optimal: ", isOptimal)
+            println(resolutionMethod[methodId], " time: " * string(round(solveTime, sigdigits=2)) * "s\n")
+        end         
+    end 
 end
-function generateInstance(height::Int64,width::Int64, density::Float64,p::Array{Float64,1})
-    minLoopLength = ceil(Int,height*width*density)
-    grid = generateLoop(height,width,minLoopLength)
-    
-    return grid
-end
-
-"""
-t =[ 
-'0' ' ' '1' ' ' ' ';
-' ' ' ' '1' ' ' ' ';
-' ' ' ' ' ' ' ' '1';
-' ' '2' '2' '3' ' ';
-'3' '2' '2' '2' '2';
-' ' '1' ' ' '2' '1';
-' ' ' ' '3' '1' '0']
-"""
-
-t =[
-' ' ' ' '2' ' ' ' ' ' ' ' ' ' ' ' ';
-'2' ' ' ' ' '1' '0' ' ' ' ' ' ' ' ';
-' ' '2' '2' ' ' ' ' ' ' ' ' '0' ' ';
-' ' ' ' ' ' ' ' ' ' ' ' '0' ' ' ' ';
-' ' ' ' ' ' ' ' ' ' '1' ' ' '0' ' ';
-'2' '0' ' ' '3' ' ' ' ' ' ' ' ' ' ';
-' ' ' ' '3' ' ' '2' '1' '1' '2' ' ';
-' ' ' ' '2' ' ' '2' '1' ' ' ' ' ' ';
-'2' ' ' '3' ' ' '2' '1' ' ' ' ' ' ']
-
-t= [
-' ' ' ' ' ' ' ' ' ' ' ' '1';
-' ' ' ' ' ' '0' '2' ' ' ' ';
-' ' '0' ' ' ' ' ' ' ' ' '1';
-' ' ' ' '3' ' ' '3' ' ' ' ';
-' ' '2' ' ' ' ' '2' ' ' '3';
-'2' '2' '2' ' ' '3' '1' ' ';
-'2' '2' '2' ' ' '2' ' ' ' ';
-' ' ' ' ' ' '2' ' ' ' ' '2';]
-
-a,x,z,tm = cplexSolve(t)
-displaySolution(t,x,z)
-s = oneLoopRule(x,z)
-println(s," ",tm)
-
-
-p = [0.1,0.6,0.5,0.5]
-t = generateInstance(10,10,0.7,p)
-println("done")
-a,x,z,tm = cplexSolve(t)
-displaySolution(t,x,z)
